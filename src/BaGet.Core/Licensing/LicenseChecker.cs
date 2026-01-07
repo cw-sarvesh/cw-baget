@@ -29,15 +29,23 @@ namespace BaGet.Core
                 };
             }
 
-            _blockedPatterns = _options.BlockedLicensePatterns?
+            // Ensure we have a valid patterns list
+            if (_options.BlockedLicensePatterns == null)
+            {
+                _options.BlockedLicensePatterns = new List<string>();
+            }
+
+            _blockedPatterns = _options.BlockedLicensePatterns
+                .Where(pattern => !string.IsNullOrWhiteSpace(pattern))
                 .Select(pattern => new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled))
-                .ToList() ?? new List<Regex>();
+                .ToList();
         }
 
         /// <summary>
         /// Checks if license filtering is enabled.
+        /// Only enabled if both Enabled is true AND there are patterns configured.
         /// </summary>
-        public bool IsEnabled => _options.Enabled;
+        public bool IsEnabled => _options.Enabled && _blockedPatterns.Count > 0;
 
         /// <summary>
         /// Checks if a license URL matches any blocked license patterns.
