@@ -67,6 +67,7 @@ namespace BaGet.Core
             services.AddBaGetOptions<MirrorOptions>(nameof(BaGetOptions.Mirror));
             services.AddBaGetOptions<SearchOptions>(nameof(BaGetOptions.Search));
             services.AddBaGetOptions<StorageOptions>(nameof(BaGetOptions.Storage));
+            services.AddBaGetOptions<LicenseFilterOptions>(nameof(BaGetOptions.LicenseFilter));
         }
 
         private static void AddBaGetServices(this IServiceCollection services)
@@ -95,6 +96,7 @@ namespace BaGet.Core
             services.TryAddTransient<IServiceIndexService, BaGetServiceIndex>();
             services.TryAddTransient<ISymbolIndexingService, SymbolIndexingService>();
             services.TryAddTransient<ISymbolStorageService, SymbolStorageService>();
+            services.TryAddTransient<LicenseChecker>();
 
             services.TryAddTransient<DatabaseSearchService>();
             services.TryAddTransient<FileStorageService>();

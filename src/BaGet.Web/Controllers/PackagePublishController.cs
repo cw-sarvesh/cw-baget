@@ -72,6 +72,15 @@ namespace BaGet.Web
                     }
                 }
             }
+            catch (RestrictedLicenseException ex)
+            {
+                _logger.LogWarning(
+                    "Package upload rejected due to restricted license: {PackageId} {PackageVersion} - {Message}",
+                    ex.PackageId,
+                    ex.PackageVersion,
+                    ex.Message);
+                HttpContext.Response.StatusCode = 403;
+            }
             catch (Exception e)
             {
                 _logger.LogError(e, "Exception thrown during package upload");

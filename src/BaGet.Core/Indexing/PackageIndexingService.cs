@@ -16,6 +16,7 @@ namespace BaGet.Core
         private readonly SystemTime _time;
         private readonly IOptionsSnapshot<BaGetOptions> _options;
         private readonly ILogger<PackageIndexingService> _logger;
+        private readonly LicenseChecker _licenseChecker;
 
         public PackageIndexingService(
             IPackageService packages,
@@ -23,7 +24,8 @@ namespace BaGet.Core
             ISearchIndexer search,
             SystemTime time,
             IOptionsSnapshot<BaGetOptions> options,
-            ILogger<PackageIndexingService> logger)
+            ILogger<PackageIndexingService> logger,
+            LicenseChecker licenseChecker)
         {
             _packages = packages ?? throw new ArgumentNullException(nameof(packages));
             _storage = storage ?? throw new ArgumentNullException(nameof(storage));
@@ -31,6 +33,7 @@ namespace BaGet.Core
             _time = time ?? throw new ArgumentNullException(nameof(time));
             _options = options ?? throw new ArgumentNullException(nameof(options));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _licenseChecker = licenseChecker ?? throw new ArgumentNullException(nameof(licenseChecker));
         }
 
         public async Task<PackageIndexingResult> IndexAsync(Stream packageStream, CancellationToken cancellationToken)
@@ -77,6 +80,20 @@ namespace BaGet.Core
                 _logger.LogError(e, "Uploaded package is invalid");
 
                 return PackageIndexingResult.InvalidPackage;
+            }
+
+            // Check for restricted licenses before indexing
+            nuspecStream.Position = 0;
+            if (_licenseChecker.IsRestrictedLicenseFromNuspec(nuspecStream))
+            {
+                var licenseInfo = LicenseChecker.GetLicenseInfo(package.LicenseUrl, null);
+                _logger.LogWarning(
+                    "Package {PackageId} {PackageVersion} has a restricted license ({LicenseInfo}) and cannot be indexed",
+                    package.Id,
+                    package.NormalizedVersionString,
+                    licenseInfo);
+
+                throw new RestrictedLicenseException(package.Id, package.Version, licenseInfo);
             }
 
             // The package is well-formed. Ensure this is a new package.

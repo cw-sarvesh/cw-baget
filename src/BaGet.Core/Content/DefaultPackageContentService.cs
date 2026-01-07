@@ -18,15 +18,18 @@ namespace BaGet.Core
         private readonly IMirrorService _mirror;
         private readonly IPackageService _packages;
         private readonly IPackageStorageService _storage;
+        private readonly LicenseChecker _licenseChecker;
 
         public DefaultPackageContentService(
             IMirrorService mirror,
             IPackageService packages,
-            IPackageStorageService storage)
+            IPackageStorageService storage,
+            LicenseChecker licenseChecker)
         {
             _mirror = mirror ?? throw new ArgumentNullException(nameof(mirror));
             _packages = packages ?? throw new ArgumentNullException(nameof(packages));
             _storage = storage ?? throw new ArgumentNullException(nameof(storage));
+            _licenseChecker = licenseChecker ?? throw new ArgumentNullException(nameof(licenseChecker));
         }
 
         public async Task<PackageVersionsResponse> GetPackageVersionsOrNullAsync(
@@ -55,6 +58,29 @@ namespace BaGet.Core
         {
             // Allow read-through caching if it is configured.
             await _mirror.MirrorAsync(id, version, cancellationToken);
+
+            // Check if package has restricted license before allowing download
+            var package = await _packages.FindOrNullAsync(id, version, includeUnlisted: true, cancellationToken);
+            if (package != null)
+            {
+                // Get nuspec to check for license expression
+                using (var nuspecStream = await _storage.GetNuspecStreamAsync(id, version, cancellationToken))
+                {
+                    if (nuspecStream != null)
+                    {
+                        if (_licenseChecker.IsRestrictedLicenseFromNuspec(nuspecStream))
+                        {
+                            var licenseInfo = LicenseChecker.GetLicenseInfo(package.LicenseUrl, null);
+                            throw new RestrictedLicenseException(id, version, licenseInfo);
+                        }
+                    }
+                    else if (_licenseChecker.IsRestrictedLicense(package.LicenseUrl))
+                    {
+                        var licenseInfo = LicenseChecker.GetLicenseInfo(package.LicenseUrl, null);
+                        throw new RestrictedLicenseException(id, version, licenseInfo);
+                    }
+                }
+            }
 
             if (!await _packages.AddDownloadAsync(id, version, cancellationToken))
             {
