@@ -16,11 +16,7 @@ namespace BaGet.Core
         /// List of license patterns to block. Patterns are case-insensitive and use regex matching.
         /// Examples: "AGPL", "GPL", "AFFERO.*GPL"
         /// </summary>
-        public List<string> BlockedLicensePatterns { get; set; } = new List<string>
-        {
-            @"\b(AGPL|AFFERO[-\s]?GPL)\b",
-            @"\bGPL\b"
-        };
+        public List<string> BlockedLicensePatterns { get; set; } = new List<string>();
     }
 }
 

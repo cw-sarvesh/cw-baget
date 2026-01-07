@@ -18,7 +18,17 @@ namespace BaGet.Core
 
         public LicenseChecker(IOptionsSnapshot<BaGetOptions> bagetOptions)
         {
-            _options = bagetOptions?.Value?.LicenseFilter ?? new LicenseFilterOptions();
+            // If LicenseFilter is not configured, create a disabled instance with no patterns
+            _options = bagetOptions?.Value?.LicenseFilter;
+            if (_options == null)
+            {
+                _options = new LicenseFilterOptions
+                {
+                    Enabled = false,
+                    BlockedLicensePatterns = new List<string>()
+                };
+            }
+
             _blockedPatterns = _options.BlockedLicensePatterns?
                 .Select(pattern => new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled))
                 .ToList() ?? new List<Regex>();
