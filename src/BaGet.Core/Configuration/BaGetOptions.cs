@@ -50,5 +50,7 @@ namespace BaGet.Core
         public SearchOptions Search { get; set; }
 
         public MirrorOptions Mirror { get; set; }
+
+        public LicenseFilterOptions LicenseFilter { get; set; }
     }
 }

@@ -39,13 +39,20 @@ namespace BaGet.Web
                 return NotFound();
             }
 
-            var packageStream = await _content.GetPackageContentStreamOrNullAsync(id, nugetVersion, cancellationToken);
-            if (packageStream == null)
+            try
             {
-                return NotFound();
-            }
+                var packageStream = await _content.GetPackageContentStreamOrNullAsync(id, nugetVersion, cancellationToken);
+                if (packageStream == null)
+                {
+                    return NotFound();
+                }
 
-            return File(packageStream, "application/octet-stream");
+                return File(packageStream, "application/octet-stream");
+            }
+            catch (RestrictedLicenseException ex)
+            {
+                return StatusCode(403, ex.Message);
+            }
         }
 
         public async Task<IActionResult> DownloadNuspecAsync(string id, string version, CancellationToken cancellationToken)

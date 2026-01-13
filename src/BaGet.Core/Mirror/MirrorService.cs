@@ -17,17 +17,20 @@ namespace BaGet.Core
         private readonly IMirrorClient _upstreamClient;
         private readonly IPackageIndexingService _indexer;
         private readonly ILogger<MirrorService> _logger;
+        private readonly LicenseChecker _licenseChecker;
 
         public MirrorService(
             IPackageService localPackages,
             IMirrorClient upstreamClient,
             IPackageIndexingService indexer,
-            ILogger<MirrorService> logger)
+            ILogger<MirrorService> logger,
+            LicenseChecker licenseChecker)
         {
             _localPackages = localPackages ?? throw new ArgumentNullException(nameof(localPackages));
             _upstreamClient = upstreamClient ?? throw new ArgumentNullException(nameof(upstreamClient));
             _indexer = indexer ?? throw new ArgumentNullException(nameof(indexer));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _licenseChecker = licenseChecker ?? throw new ArgumentNullException(nameof(licenseChecker));
         }
 
         public async Task<IReadOnlyList<NuGetVersion>> FindPackageVersionsAsync(
@@ -185,6 +188,25 @@ namespace BaGet.Core
                 id,
                 version);
 
+            // Check license from upstream metadata before downloading
+            var upstreamMetadata = await _upstreamClient.GetPackageMetadataAsync(id, cancellationToken);
+            var packageMetadata = upstreamMetadata?.FirstOrDefault(m => m.ParseVersion() == version);
+
+            if (packageMetadata != null)
+            {
+                var licenseUrl = ParseUri(packageMetadata.LicenseUrl);
+                if (_licenseChecker.IsRestrictedLicense(licenseUrl))
+                {
+                    var licenseInfo = LicenseChecker.GetLicenseInfo(licenseUrl, null);
+                    _logger.LogWarning(
+                        "Package {PackageId} {PackageVersion} has a restricted license ({LicenseInfo}) and cannot be mirrored",
+                        id,
+                        version,
+                        licenseInfo);
+                    throw new RestrictedLicenseException(id, version, licenseInfo);
+                }
+            }
+
             Stream packageStream = null;
 
             try
@@ -206,6 +228,11 @@ namespace BaGet.Core
                     id,
                     version,
                     result);
+            }
+            catch (RestrictedLicenseException)
+            {
+                // Re-throw restricted license exceptions
+                throw;
             }
             catch (PackageNotFoundException)
             {
